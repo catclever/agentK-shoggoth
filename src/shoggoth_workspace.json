@@ -1,0 +1,39 @@
+{
+  "id": "shoggoth-v2-ide",
+  "name": "Shoggoth IDE Layout",
+  "components": [
+    {
+      "id": "tool-gladius",
+      "type": "GladiusConsole",
+      "props": {
+        "title": "GLADIUS CONSOLE"
+      },
+      "canvas": {
+        "x": 200,
+        "y": 600,
+        "width": 600,
+        "height": 300
+      }
+    },
+    {
+      "id": "tool-eye",
+      "type": "EyeAIPanel",
+      "props": {
+        "title": "AGENT F (EYE)"
+      }
+    },
+    {
+      "id": "tool-azathoth",
+      "type": "AzathothRegistry",
+      "props": {
+        "title": "AZATHOTH REGISTRY"
+      },
+      "canvas": {
+        "x": 20,
+        "y": 60,
+        "width": 300,
+        "height": 400
+      }
+    }
+  ]
+}
