@@ -29,7 +29,9 @@
     "paths": {
       "@agent-k/tentacles": ["../libs/tentacles/src/index.ts"],
       "@agent-k/gladius": ["../libs/gladius/src/index.ts"],
-      "@agent-k/eyes": ["../libs/eyes/src/index.ts"]
+      "@agent-k/eyes": ["../libs/eyes/src/index.ts"],
+      "@agent-k/azathoth": ["../libs/azathoth/src/index.ts"],
+      "@agent-k/atoms": ["../atoms/src/index.ts"]
     }
   },
   "include": ["src"]

@@ -9,10 +9,13 @@ import shoggothSpec from './shoggoth_workspace.json'
 import type { ComponentInstance } from './types'
 import './App.css'
 
+import { Routes, Route } from 'react-router-dom'
+import { FigmaCanvas } from './components/FigmaCanvas'
+
 // Mock Data for Canvas (Ideally this comes from the loaded project's JSON)
 const INITIAL_COMPONENTS: ComponentInstance[] = [];
 
-function App() {
+function IdeWorkspace() {
   const [components, setComponents] = useState<ComponentInstance[]>(INITIAL_COMPONENTS);
   const [scale, setScale] = useState(1);
   const [projectName, setProjectName] = useState('demo-app');
@@ -188,11 +191,11 @@ function App() {
           return (
             <DraggableWindow 
               key={c.id}
-              title={c.props.title || "GLADIUS CONSOLE"} 
-              initialX={c.canvas.x} 
-              initialY={c.canvas.y}
-              initialWidth={c.canvas.width}
-              initialHeight={c.canvas.height}
+              title={c.props?.title || "GLADIUS CONSOLE"} 
+              initialX={c.canvas?.x || 0} 
+              initialY={c.canvas?.y || 0}
+              initialWidth={c.canvas?.width || 600}
+              initialHeight={c.canvas?.height || 400}
             >
               <div className="w-full h-full bg-black p-2">
                 <GladiusTerminal onTerminalReady={setTerm} />
@@ -204,11 +207,11 @@ function App() {
           return (
             <DraggableWindow 
               key={c.id}
-              title={c.props.title || "AZATHOTH"} 
-              initialX={c.canvas.x} 
-              initialY={c.canvas.y}
-              initialWidth={c.canvas.width}
-              initialHeight={c.canvas.height}
+              title={c.props?.title || "AZATHOTH"} 
+              initialX={c.canvas?.x || 0} 
+              initialY={c.canvas?.y || 0}
+              initialWidth={c.canvas?.width || 600}
+              initialHeight={c.canvas?.height || 400}
             >
               <Azathoth />
             </DraggableWindow>
@@ -218,11 +221,11 @@ function App() {
           return (
             <DraggableWindow 
               key={c.id}
-              title={c.props.title || "AGENT F (EYE)"} 
-              initialX={c.canvas.x} 
-              initialY={c.canvas.y}
-              initialWidth={c.canvas.width}
-              initialHeight={c.canvas.height}
+              title={c.props?.title || "AGENT F (EYE)"} 
+              initialX={c.canvas?.x || 0} 
+              initialY={c.canvas?.y || 0}
+              initialWidth={c.canvas?.width || 600}
+              initialHeight={c.canvas?.height || 400}
             >
               <AIPanel />
             </DraggableWindow>
@@ -232,6 +235,15 @@ function App() {
       })}
     </div>
   )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<IdeWorkspace />} />
+      <Route path="/figma" element={<FigmaCanvas />} />
+    </Routes>
+  );
 }
 
 export default App
