@@ -99,8 +99,8 @@ export default defineConfig({
                   
                   if (!portResolved) {
                     outputBuffer += text;
-                    // Match Vite's output:   ➜  Local:   http://localhost:5174/
-                    const match = outputBuffer.match(/http:\/\/localhost:(\\d+)/);
+                    // Match Vite's output:   ➜  Local:   http://localhost:5174/ or 127.0.0.1
+                    const match = outputBuffer.match(/http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
                     if (match) {
                       portResolved = true;
                       const port = match[1];

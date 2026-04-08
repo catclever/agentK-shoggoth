@@ -194,10 +194,13 @@ function IdeWorkspace() {
               const cx = (canvasConfig.x || 0) + (canvasConfig.width || 0) + 16;
               const cy = (canvasConfig.y || 0) - 20;
               return (
-                 <div key="eye-popup" className="absolute z-50 w-80 h-96 shadow-[0_0_40px_rgba(0,0,0,0.5)] rounded-xl overflow-hidden glassmorphism" 
-                      style={{ left: cx, top: cy, backdropFilter: 'blur(16px)' }}>
-                    <div className="h-8 bg-black/50 backdrop-blur-md border-b border-white/10 flex items-center px-4 font-mono text-[10px] text-blue-400">
-                       [AGENT F] ATTACHED TO: {c.type}
+                 <div key="eye-popup" className="absolute z-50 w-80 h-96 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800" 
+                      style={{ left: cx, top: cy }}>
+                    <div className="h-8 bg-zinc-800 border-b border-black/50 flex items-center justify-between px-4 font-mono text-[10px]">
+                       <span className="text-blue-400">[AGENT F] ATTACHED TO: {c.type}</span>
+                       <button onClick={() => setSelectedId(null)} className="text-neutral-500 hover:text-white transition-colors">
+                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                       </button>
                     </div>
                     <div className="w-full h-[calc(100%-2rem)] bg-black/80">
                        <AIPanel />
@@ -222,7 +225,6 @@ function IdeWorkspace() {
       startTargetProcess={startTargetProcess}
       stopTargetProcess={stopTargetProcess}
       componentCount={components.length}
-      terminalReady={!!term}
       rightPanelTop={rightPanelTop}
       rightPanelBottomSlot={rightPanelBottomSlot}
       topLeftTerminalSlot={topLeftTerminalSlot}

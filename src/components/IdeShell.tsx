@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Terminal, Settings, Database, Sparkles, X, Menu, Play, Square, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Terminal, Settings, Sparkles, X, Play, Square, Loader2 } from 'lucide-react';
 
 interface IdeShellProps {
   projectName: string;
@@ -8,7 +8,6 @@ interface IdeShellProps {
   isExternal: boolean;
   externalPort: string | null;
   componentCount: number;
-  terminalReady: boolean;
   bootStatus: 'idle' | 'booting' | 'online';
   startTargetProcess: () => void;
   stopTargetProcess: () => void;
@@ -22,7 +21,7 @@ interface IdeShellProps {
 }
 
 export const IdeShell: React.FC<IdeShellProps> = ({
-  projectName, setProjectName, serverUrl, isExternal, externalPort, componentCount, terminalReady,
+  projectName, setProjectName, serverUrl, isExternal, externalPort, componentCount,
   bootStatus, startTargetProcess, stopTargetProcess,
   rightPanelTop, rightPanelBottomSlot, topLeftTerminalSlot, canvasArea, contextualEyeSlot
 }) => {
@@ -120,7 +119,7 @@ export const IdeShell: React.FC<IdeShellProps> = ({
         {/* CLI Sliding Dropdown (Absolute Top Left over Canvas) */}
         <div 
           className={`absolute top-0 left-4 z-40 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xl rounded-b-xl border-x border-b border-white/10 bg-black/70 backdrop-blur-2xl overflow-hidden flex flex-col ${
-            terminalOpen ? 'translate-y-0 opacity-100 h-[60vh] w-[800px]' : '-translate-y-[100%] opacity-0 h-[60vh] w-[800px]'
+            terminalOpen ? 'translate-y-0 opacity-100 h-[60vh] w-[800px] pointer-events-auto' : '-translate-y-full opacity-0 h-[60vh] w-[800px] pointer-events-none'
           }`}
         >
           {/* CLI Header bar */}

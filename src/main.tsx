@@ -6,11 +6,11 @@ import './index.css'
 import App from './App.tsx'
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error: any}> {
-  constructor(props) {
+  constructor(props: any) {
     super(props);
     this.state = { error: null };
   }
-  static getDerivedStateFromError(error) { return { error }; }
+  static getDerivedStateFromError(error: any) { return { error }; }
   render() {
     if (this.state.error) return (
       <div style={{color:'red', padding:'20px', background:'black', minHeight:'100vh'}}>

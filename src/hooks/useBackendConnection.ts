@@ -8,6 +8,12 @@ export function useBackendConnection(projectName: string, terminal: any) {
   const [externalPort, setExternalPort] = useState<string | null>(null);
   const [bootStatus, setBootStatus] = useState<BootStatus>('idle');
   const eventSourceRef = useRef<EventSource | null>(null);
+  const terminalRef = useRef<any>(terminal);
+
+  // Keep ref updated to avoid closure staleness
+  useEffect(() => {
+    terminalRef.current = terminal;
+  }, [terminal]);
 
   // 1. Establish SSE Streams globally when hook launches and handle Terminal writing
   useEffect(() => {
@@ -18,8 +24,8 @@ export function useBackendConnection(projectName: string, terminal: any) {
       es.onmessage = (event) => {
         try {
           const logData = JSON.parse(event.data);
-          if (terminal) {
-             terminal.write(logData);
+          if (terminalRef.current) {
+             terminalRef.current.write(logData);
           }
         } catch (e) {
           console.error("SSE parse error", e);
