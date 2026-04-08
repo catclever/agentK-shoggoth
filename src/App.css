@@ -7,3 +7,12 @@
   max-width: none;
   text-align: left;
 }
+
+/* Force Moveable controls to be clickable above the native layers */
+.moveable-control-box,
+.moveable-control,
+.moveable-line,
+.moveable-rotation,
+.moveable-direction {
+  pointer-events: auto !important;
+}

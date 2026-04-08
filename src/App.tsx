@@ -226,20 +226,19 @@ function IdeWorkspace() {
                }`}
                style={{
                  left: x, top: y, width, height, position: 'absolute',
-                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                 transform: `rotate(${rotation || 0}deg)`,
                  cursor: 'pointer'
                }}
              />
            );
         })}
-
-        {hasTentacles && (
-          <TentaclesOverlay 
-            targetId={selectedId} 
-            onUpdate={handleUpdate}
-            scale={scale}
-          />
-        )}
+         {hasTentacles && (
+           <TentaclesOverlay 
+             targetId={selectedId} 
+             onUpdate={handleUpdate}
+             scale={scale}
+           />
+         )}
       </div>
 
       {/* Floating Contextual Eye Layer over the canvas */}
