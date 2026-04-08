@@ -1,14 +1,34 @@
-import { useState, useEffect, useMemo } from 'react'
-import { TentaclesOverlay, Artboard } from '@agent-k/tentacles'
-import { AIPanel } from '@agent-k/eyes'
-import { GladiusTerminal } from '@agent-k/gladius'
-import { Azathoth } from '@agent-k/azathoth'
+import React, { useState, useEffect, Suspense } from 'react'
+import { Artboard, TentaclesOverlay } from '@agent-k/tentacles' // Core UI component, statically bundled
+import { ShoggothKernelProvider } from '@agent-k/core'
 import { useBackendConnection } from './hooks/useBackendConnection'
 import { loadProject } from './utils/projectLoader'
 import shoggothSpec from './shoggoth_workspace.json'
 import type { ComponentInstance } from './types'
 import { IdeShell } from './components/IdeShell'
 import './App.css'
+
+import { GladiusTerminal } from '@agent-k/gladius';
+import { AIPanel } from '@agent-k/eyes';
+import { Azathoth } from '@agent-k/azathoth';
+
+// Capability Filter System 
+// In a real system, the backend reports these capabilities upon connection.
+const BACKEND_CAPABILITIES = ['terminal', 'vision', 'canvas', 'schema'];
+
+const EXTENSION_CAPABILITIES: Record<string, string[]> = {
+  'GladiusConsole': ['terminal'],
+  'EyeAIPanel': ['vision'],
+  'AzathothRegistry': ['schema'],
+  'TentaclesOverlay': ['canvas']
+};
+
+// Check if a component type's dependencies are fully met by the backend
+const checkCapabilities = (type: string, activeCapabilities: string[]) => {
+  const requirements = EXTENSION_CAPABILITIES[type];
+  if (!requirements) return false;
+  return requirements.every(req => activeCapabilities.includes(req));
+};
 
 import { Routes, Route } from 'react-router-dom'
 import { FigmaCanvas } from './components/FigmaCanvas'
@@ -108,10 +128,12 @@ function IdeWorkspace() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Extract tools from shoggothSpec
-  const hasGladius = shoggothSpec.components.some(c => c.type === 'GladiusConsole');
-  const hasAzathoth = shoggothSpec.components.some(c => c.type === 'AzathothRegistry');
-  const hasEye = shoggothSpec.components.some(c => c.type === 'EyeAIPanel');
+  // Extract tools from filtered shoggothSpec
+  const activePlugins = shoggothSpec.components.filter(c => checkCapabilities(c.type, BACKEND_CAPABILITIES));
+  const hasGladius = activePlugins.some(c => c.type === 'GladiusConsole');
+  const hasAzathoth = activePlugins.some(c => c.type === 'AzathothRegistry');
+  const hasEye = activePlugins.some(c => c.type === 'EyeAIPanel');
+  const hasTentacles = activePlugins.some(c => c.type === 'TentaclesOverlay');
 
   // The Right Panel Properties
   const rightPanelTop = (
@@ -130,15 +152,18 @@ function IdeWorkspace() {
   // Azathoth
   const rightPanelBottomSlot = hasAzathoth ? (
     <div className="flex-1 overflow-hidden">
-       {/* Use Renderer locally or just mount it. We mount directly for integration. */}
-       <Azathoth />
+       <Suspense fallback={<div className="p-4 text-xs text-neutral-500">Loading Azathoth Module...</div>}>
+         <Azathoth />
+       </Suspense>
     </div>
   ) : null;
 
   // Gladius
   const topLeftTerminalSlot = hasGladius ? (
     <div className="w-full h-full bg-black">
-      <GladiusTerminal onTerminalReady={setTerm} />
+      <Suspense fallback={<div className="p-4 text-xs text-neutral-500">Initializing Terminal Sandbox...</div>}>
+        <GladiusTerminal onTerminalReady={setTerm} />
+      </Suspense>
     </div>
   ) : null;
 
@@ -160,41 +185,72 @@ function IdeWorkspace() {
 
   const canvasArea = (
     <Artboard scale={scale} onScaleChange={setScale} panning={false} autoResize={true}>
-      <div className="absolute inset-0 bg-[#e4e4e7] dark:bg-[#18181b]">
+      <div className="absolute inset-0 bg-[#e4e4e7] dark:bg-[#18181b]" onClick={() => setSelectedId(null)}>
          {serverUrl && !isExternal ? (
            <iframe 
              src={serverUrl} 
-             className="w-full h-full border-none opacity-90"
+             className="w-full h-full border-none opacity-90 pointer-events-none"
              title="App Preview"
            />
          ) : serverUrl && isExternal ? (
-           <div className="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-900 border-none">
+           <div className="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-900 border-none pointer-events-none">
               <span className="animate-pulse">Loading External Canvas Preview...</span>
            </div>
          ) : (
-           <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-2">
+           <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-2 pointer-events-none">
              <span className="animate-pulse font-mono tracking-widest text-lg">WAITING FOR CORE</span>
              <span className="text-xs">Establish local dev backend.</span>
            </div>
          )}
       </div>
 
-      <TentaclesOverlay 
-        components={components} 
-        scale={scale} 
-        onUpdate={handleUpdate}
-        onSelect={setSelectedId}
-      />
+      {/* Native Interception Layer for Selections */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+        {components.map(component => {
+           const isSelected = selectedId === component.id;
+           const x = component.x ?? 0;
+           const y = component.y ?? 0;
+           const width = component.width ?? 0;
+           const height = component.height ?? 0;
+           const rotation = component.rotation ?? 0;
+           
+           return (
+             <div 
+               key={component.id}
+               id={`overlay-${component.id}`}
+               onClick={(e) => { e.stopPropagation(); setSelectedId(component.id); }}
+               className={`absolute pointer-events-auto transition-shadow duration-200 select-none touch-none ${
+                 isSelected 
+                   ? (hasTentacles ? 'bg-transparent border-transparent z-40' : 'z-50 border-2 border-blue-500 bg-blue-500/10') 
+                   : 'hover:ring-1 hover:ring-blue-300 z-10 border border-transparent hover:border-black/10 dark:hover:border-white/20'
+               }`}
+               style={{
+                 left: x, top: y, width, height, position: 'absolute',
+                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                 cursor: 'pointer'
+               }}
+             />
+           );
+        })}
+
+        {hasTentacles && (
+          <TentaclesOverlay 
+            targetId={selectedId} 
+            onUpdate={handleUpdate}
+            scale={scale}
+          />
+        )}
+      </div>
 
       {/* Floating Contextual Eye Layer over the canvas */}
       {hasEye && selectedId && (
         components.map(c => {
            if (c.id === selectedId) {
-              const canvasConfig = (c as any).canvas || {};
-              const cx = (canvasConfig.x || 0) + (canvasConfig.width || 0) + 16;
-              const cy = (canvasConfig.y || 0) - 20;
+              // Position the 'Eye' popup strictly to the right side of the component wrapper.
+              const cx = (c.x ?? 0) + (c.width ?? 0) + 24;
+              const cy = (c.y ?? 0);
               return (
-                 <div key="eye-popup" className="absolute z-50 w-80 h-96 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800" 
+                 <div key="eye-popup" className="absolute z-50 w-[360px] h-[400px] shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 transition-all duration-150 ease-out" 
                       style={{ left: cx, top: cy }}>
                     <div className="h-8 bg-zinc-800 border-b border-black/50 flex items-center justify-between px-4 font-mono text-[10px]">
                        <span className="text-blue-400">[AGENT F] ATTACHED TO: {c.type}</span>
@@ -203,7 +259,9 @@ function IdeWorkspace() {
                        </button>
                     </div>
                     <div className="w-full h-[calc(100%-2rem)] bg-black/80">
-                       <AIPanel />
+                       <Suspense fallback={<div className="p-4 pt-10 text-center text-xs text-blue-500">Loading Visual Copilot...</div>}>
+                         <AIPanel />
+                       </Suspense>
                     </div>
                  </div>
               );
@@ -215,22 +273,24 @@ function IdeWorkspace() {
   );
 
   return (
-    <IdeShell 
-      projectName={projectName}
-      setProjectName={setProjectName}
-      serverUrl={serverUrl}
-      isExternal={isExternal}
-      externalPort={externalPort}
-      bootStatus={bootStatus}
-      startTargetProcess={startTargetProcess}
-      stopTargetProcess={stopTargetProcess}
-      componentCount={components.length}
-      rightPanelTop={rightPanelTop}
-      rightPanelBottomSlot={rightPanelBottomSlot}
-      topLeftTerminalSlot={topLeftTerminalSlot}
-      canvasArea={canvasArea}
-      contextualEyeSlot={contextualEyeSlot}
-    />
+    <ShoggothKernelProvider>
+      <IdeShell 
+        projectName={projectName}
+        setProjectName={setProjectName}
+        serverUrl={serverUrl}
+        isExternal={isExternal}
+        externalPort={externalPort}
+        bootStatus={bootStatus}
+        startTargetProcess={startTargetProcess}
+        stopTargetProcess={stopTargetProcess}
+        componentCount={components.length}
+        rightPanelTop={rightPanelTop}
+        rightPanelBottomSlot={rightPanelBottomSlot}
+        topLeftTerminalSlot={topLeftTerminalSlot}
+        canvasArea={canvasArea}
+        contextualEyeSlot={contextualEyeSlot}
+      />
+    </ShoggothKernelProvider>
   )
 }
 

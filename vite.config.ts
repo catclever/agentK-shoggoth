@@ -61,7 +61,9 @@ export default defineConfig({
 
           if (req.method === 'POST' && req.url === '/api/process/stop') {
              if (activeChild) {
-               activeChild.kill('SIGTERM');
+               try {
+                 activeChild.kill('SIGTERM');
+               } catch(e) {}
                activeChild = null;
                broadcast('[Orchestrator] Target Process Terminated.\\r\\n');
              }
@@ -77,7 +79,9 @@ export default defineConfig({
               try {
                 const { projectName } = JSON.parse(body); // e.g. "demo-app"
                 if (activeChild) {
-                  activeChild.kill('SIGTERM');
+                  try {
+                    activeChild.kill('SIGTERM');
+                  } catch(e) {}
                 }
                 
                 outputBuffer = '';
@@ -85,9 +89,20 @@ export default defineConfig({
                 
                 broadcast(`[Orchestrator] Launching npm run dev in ${targetCwd}...\\r\\n`);
                 
-                activeChild = spawn('npm', ['run', 'dev'], { 
-                  cwd: targetCwd,
-                  shell: true // Important for cross-platform npm resolving
+                // Use cross-platform npm executable name without shell wrapping.
+                // This ensures npm resolves hoisted monorepo bins while keeping perfect 1-to-1 signal forwarding.
+                const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+                activeChild = spawn(npmCmd, ['run', 'dev'], { 
+                  cwd: targetCwd
+                });
+                
+                // Catch raw spawn errors to avoid silent crashes
+                activeChild.on('error', (err: any) => {
+                  broadcast(`\\r\\n[Orchestrator Error] Failed to start vite: ${err.message}\\r\\n`);
+                  if (!portResolved) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ error: err.message }));
+                  }
                 });
 
                 let portResolved = false;
@@ -149,9 +164,9 @@ export default defineConfig({
     fs: {
       allow: ['..']
     },
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-    },
+    watch: {
+      // Prevent Shoggoth IDE from auto-reloading its own DOM when the target app's source code is updated via Tentacles
+      ignored: ['**/apps/**']
+    }
   }
 })

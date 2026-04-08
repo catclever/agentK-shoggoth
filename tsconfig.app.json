@@ -27,6 +27,7 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
+      "@agent-k/core": ["../core/src/index.ts"],
       "@agent-k/tentacles": ["../libs/tentacles/src/index.ts"],
       "@agent-k/gladius": ["../libs/gladius/src/index.ts"],
       "@agent-k/eyes": ["../libs/eyes/src/index.ts"],
