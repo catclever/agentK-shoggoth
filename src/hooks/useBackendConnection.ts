@@ -1,20 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-// Maps project names to their expected local dev server ports
-// Since demo-app usually occupies 5174 when shoggoth takes 5173
-const APP_PORTS: Record<string, string> = {
-  'demo-app': '5174',
-  'todo-app': '5175'
-};
+export type BootStatus = 'idle' | 'booting' | 'online';
 
 export function useBackendConnection(projectName: string, terminal: any) {
   const [serverUrl, setServerUrl] = useState<string>('');
   const [isExternal, setIsExternal] = useState<boolean>(false);
   const [externalPort, setExternalPort] = useState<string | null>(null);
-  
+  const [bootStatus, setBootStatus] = useState<BootStatus>('idle');
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  // 1. Establish SSE Streams globally when hook launches and handle Terminal writing
   useEffect(() => {
-    // 1. Establish the connection URL to the local dev server
-    // Check if the user explicitly provided a target port in the Shoggoth URL (e.g. ?port=8080)
+    // Only connect SSE if we aren't connected yet (prevent duplicate streams on render)
+    if (!eventSourceRef.current) {
+      const es = new EventSource('/api/process/stream');
+      
+      es.onmessage = (event) => {
+        try {
+          const logData = JSON.parse(event.data);
+          if (terminal) {
+             terminal.write(logData);
+          }
+        } catch (e) {
+          console.error("SSE parse error", e);
+        }
+      };
+
+      es.onerror = () => {
+         // SSE fails on boot temporarily sometimes
+      };
+
+      eventSourceRef.current = es;
+    }
+
+    return () => {
+      // Intentionally leak SSE or clean up on unmount
+      if (eventSourceRef.current) {
+         eventSourceRef.current.close();
+         eventSourceRef.current = null;
+      }
+    };
+  }, [terminal]); // Bind strictly terminal writes once terminal is ready.
+
+  useEffect(() => {
+    // Determine if External Port exists
     const urlParams = new URLSearchParams(window.location.search);
     const customPort = urlParams.get('port');
     
@@ -22,23 +51,53 @@ export function useBackendConnection(projectName: string, terminal: any) {
       setIsExternal(true);
       setExternalPort(customPort);
       setServerUrl(`http://localhost:${customPort}`);
-      if (terminal) {
-        terminal.write(`\\r\\n[Agent K Bridge] Connected to EXTERNAL environment on port: ${customPort}\\r\\n`);
-      }
+      setBootStatus('online');
+      if (terminal) terminal.write(`\\r\\n[Agent K] Connected via External Port\\r\\n`);
     } else {
       setIsExternal(false);
-      setExternalPort(null);
-      const port = APP_PORTS[projectName] || '5174';
-      setServerUrl(`http://localhost:${port}`);
-      if (terminal) {
-        terminal.write(`\\r\\n[Agent K Bridge] Connected to internal workspace app: ${projectName}\\r\\n`);
-      }
+      setServerUrl(''); // Clear until started!
+      setBootStatus('idle');
+      if (terminal) terminal.write(`\\r\\n[Agent K] Workspace configured: ${projectName}. Awaiting ignition.\\r\\n`);
     }
-
-    // 2. Here we could hook up a WebSocket to receive terminal logs from 
-    // the local dev server, but for Phase 1 we just assume it's running.
-
   }, [projectName, terminal]);
 
-  return { serverUrl, isExternal, externalPort };
+  const startTargetProcess = async () => {
+    if (isExternal) return;
+    setBootStatus('booting');
+    if (terminal) terminal.write(`\\r\\n[System] Initiating local dev orchestrator for: ${projectName}\\r\\n`);
+    
+    try {
+      const res = await fetch('/api/process/start', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ projectName })
+      });
+      const data = await res.json();
+      if (data.port) {
+         setServerUrl(`http://localhost:${data.port}`);
+         setBootStatus('online');
+         if (terminal) terminal.write(`\\r\\n[System] Process Orchestrator locked visual proxy to port: ${data.port}\\r\\n`);
+      } else {
+         setBootStatus('idle');
+         if (terminal) terminal.write(`\\r\\n[System Error] Failed to resolve port from orchestrator.\\r\\n`);
+      }
+    } catch (err: any) {
+      setBootStatus('idle');
+      if (terminal) terminal.write(`\\r\\n[System Error] API error: ${err.message}\\r\\n`);
+    }
+  };
+
+  const stopTargetProcess = async () => {
+    if (isExternal) return;
+    setServerUrl('');
+    setBootStatus('idle');
+    try {
+      await fetch('/api/process/stop', { method: 'POST' });
+      if (terminal) terminal.write(`\\r\\n[System] Orchestrated process manually killed.\\r\\n`);
+    } catch (e) {
+       console.error("Stop error", e);
+    }
+  };
+
+  return { serverUrl, isExternal, externalPort, bootStatus, startTargetProcess, stopTargetProcess };
 }

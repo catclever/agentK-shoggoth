@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { TentaclesOverlay, Artboard, DraggableWindow } from '@agent-k/tentacles'
+import { useState, useEffect, useMemo } from 'react'
+import { TentaclesOverlay, Artboard } from '@agent-k/tentacles'
 import { AIPanel } from '@agent-k/eyes'
 import { GladiusTerminal } from '@agent-k/gladius'
 import { Azathoth } from '@agent-k/azathoth'
@@ -7,6 +7,7 @@ import { useBackendConnection } from './hooks/useBackendConnection'
 import { loadProject } from './utils/projectLoader'
 import shoggothSpec from './shoggoth_workspace.json'
 import type { ComponentInstance } from './types'
+import { IdeShell } from './components/IdeShell'
 import './App.css'
 
 import { Routes, Route } from 'react-router-dom'
@@ -21,7 +22,7 @@ function IdeWorkspace() {
   const [projectName, setProjectName] = useState('demo-app');
 
   const [term, setTerm] = useState<any>(null);
-  const { serverUrl, isExternal, externalPort } = useBackendConnection(projectName, term);
+  const { serverUrl, isExternal, externalPort, bootStatus, startTargetProcess, stopTargetProcess } = useBackendConnection(projectName, term);
   
   // Load Project
   useEffect(() => {
@@ -105,135 +106,129 @@ function IdeWorkspace() {
     return () => window.removeEventListener('message', handleMessage);
   }, [term]);
 
-  return (
-    <div className="bone-root w-screen h-screen bg-gray-900 text-white overflow-hidden relative">
-      {/* Main Workspace */}
-      <div className="absolute inset-0 z-0 flex flex-col">
-        {/* Header / Dock */}
-        <div className="h-12 bg-gray-800 border-b border-gray-700 flex items-center px-4 justify-between z-10 relative">
-          <div className="flex items-center gap-4">
-            <span className="font-bold text-blue-400">Agent K Studio</span>
-            {isExternal ? (
-              <select className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-500 cursor-not-allowed" disabled>
-                <option>External Instance (Port: {externalPort})</option>
-              </select>
-            ) : (
-              <select 
-                className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-              >
-                <option value="demo-app">apps/demo-app</option>
-                <option value="todo-app">apps/todo-app (Mock)</option>
-              </select>
-            )}
-          </div>
-          <div className="text-xs text-gray-500 flex gap-4">
-             <span>Components: {components.length}</span>
-            {serverUrl ? `Server: ${serverUrl}` : 'Booting...'}
-          </div>
-        </div>
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-        {/* Workspace Area (Canvas + Right Panel) */}
-        <div className="flex-1 flex flex-row overflow-hidden">
-          {/* Canvas Area */}
-          <div className="flex-1 relative bg-gray-900">
-            <Artboard scale={scale} onScaleChange={setScale} panning={false} autoResize={true}>
-              {/* Layer 0: The App Renderer (Iframe) */}
-              <div className="absolute inset-0 bg-white">
-                 {serverUrl ? (
-                   <iframe 
-                     src={serverUrl} 
-                     className="w-full h-full border-none"
-                     title="App Preview"
-                   />
-                 ) : (
-                   <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
-                     <span className="animate-pulse">Waiting for Local Server (npm run dev:{projectName})...</span>
-                     <span className="text-xs">Make sure you have started the local backend in a separate terminal.</span>
-                   </div>
-                 )}
-              </div>
+  // Extract tools from shoggothSpec
+  const hasGladius = shoggothSpec.components.some(c => c.type === 'GladiusConsole');
+  const hasAzathoth = shoggothSpec.components.some(c => c.type === 'AzathothRegistry');
+  const hasEye = shoggothSpec.components.some(c => c.type === 'EyeAIPanel');
 
-              {/* Layer 1: The Tentacles Overlay (Plugin) */}
-              <TentaclesOverlay 
-                components={components} 
-                scale={scale} 
-                onUpdate={handleUpdate}
-                onSelect={(id) => console.log('Selected:', id)}
-              />
-            </Artboard>
-          </div>
+  // The Right Panel Properties
+  const rightPanelTop = (
+    <div className="text-neutral-400 text-sm">
+       {selectedId ? (
+         <div>
+            <div className="font-mono text-blue-400 mb-2">ID: {selectedId}</div>
+            <div className="text-neutral-500">More properties will be available here when wired.</div>
+         </div>
+       ) : (
+         <div>Select an element to view properties.</div>
+       )}
+    </div>
+  );
 
-          {/* Right Panel (Properties / AI) */}
-          <div className="w-80 bg-gray-800 border-l border-gray-700 flex flex-col z-40">
-            <div className="p-4 border-b border-gray-700 font-bold text-gray-300">
-              Properties
-            </div>
-            <div className="p-4 text-gray-400 text-sm">
-              Select an element to view properties.
-            </div>
-            
-            <div className="mt-auto p-4 border-t border-gray-700">
-               <div className="font-bold text-gray-300 mb-2">AI Assistant</div>
-               <div className="h-32 bg-gray-900 rounded border border-gray-700 p-2 text-xs text-green-400 font-mono overflow-y-auto">
-                 {term ? 'Terminal Ready' : 'Initializing...'}
-               </div>
-            </div>
-          </div>
-        </div>
+  // Azathoth
+  const rightPanelBottomSlot = hasAzathoth ? (
+    <div className="flex-1 overflow-hidden">
+       {/* Use Renderer locally or just mount it. We mount directly for integration. */}
+       <Azathoth />
+    </div>
+  ) : null;
+
+  // Gladius
+  const topLeftTerminalSlot = hasGladius ? (
+    <div className="w-full h-full bg-black">
+      <GladiusTerminal onTerminalReady={setTerm} />
+    </div>
+  ) : null;
+
+  // Contextual Eye
+  // Locate the selected component bounds perfectly and render Eye floating slightly right of it.
+  const contextualEyeSlot = (hasEye && selectedId) ? (
+    <div 
+      className="absolute z-50 transition-all duration-300 pointer-events-auto"
+      style={{
+         // We guess position by locating it in components array (Tentacles overlays this).
+         // A more advanced engine uses React Refs, but using absolute canvas x/y works perfectly as Artboard does not scale it immediately.
+         // Let's attach an abstract popup.
+         top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+      }}
+    >
+       <div id={`eye-portal-anchor-${selectedId}`} />
+    </div>
+  ) : null;
+
+  const canvasArea = (
+    <Artboard scale={scale} onScaleChange={setScale} panning={false} autoResize={true}>
+      <div className="absolute inset-0 bg-[#e4e4e7] dark:bg-[#18181b]">
+         {serverUrl && !isExternal ? (
+           <iframe 
+             src={serverUrl} 
+             className="w-full h-full border-none opacity-90"
+             title="App Preview"
+           />
+         ) : serverUrl && isExternal ? (
+           <div className="w-full h-full flex items-center justify-center text-neutral-500 bg-neutral-900 border-none">
+              <span className="animate-pulse">Loading External Canvas Preview...</span>
+           </div>
+         ) : (
+           <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-2">
+             <span className="animate-pulse font-mono tracking-widest text-lg">WAITING FOR CORE</span>
+             <span className="text-xs">Establish local dev backend.</span>
+           </div>
+         )}
       </div>
 
-      {/* Layer 2: The Eye (Overlays - Driven by JSON Bootstrap) */}
-      
-      {shoggothSpec.components.map((c: any) => {
-        if (c.type === 'GladiusConsole') {
-          return (
-            <DraggableWindow 
-              key={c.id}
-              title={c.props?.title || "GLADIUS CONSOLE"} 
-              initialX={c.canvas?.x || 0} 
-              initialY={c.canvas?.y || 0}
-              initialWidth={c.canvas?.width || 600}
-              initialHeight={c.canvas?.height || 400}
-            >
-              <div className="w-full h-full bg-black p-2">
-                <GladiusTerminal onTerminalReady={setTerm} />
-              </div>
-            </DraggableWindow>
-          );
-        }
-        if (c.type === 'AzathothRegistry') {
-          return (
-            <DraggableWindow 
-              key={c.id}
-              title={c.props?.title || "AZATHOTH"} 
-              initialX={c.canvas?.x || 0} 
-              initialY={c.canvas?.y || 0}
-              initialWidth={c.canvas?.width || 600}
-              initialHeight={c.canvas?.height || 400}
-            >
-              <Azathoth />
-            </DraggableWindow>
-          );
-        }
-        if (c.type === 'EyeAIPanel') {
-          return (
-            <DraggableWindow 
-              key={c.id}
-              title={c.props?.title || "AGENT F (EYE)"} 
-              initialX={c.canvas?.x || 0} 
-              initialY={c.canvas?.y || 0}
-              initialWidth={c.canvas?.width || 600}
-              initialHeight={c.canvas?.height || 400}
-            >
-              <AIPanel />
-            </DraggableWindow>
-          );
-        }
-        return null;
-      })}
-    </div>
+      <TentaclesOverlay 
+        components={components} 
+        scale={scale} 
+        onUpdate={handleUpdate}
+        onSelect={setSelectedId}
+      />
+
+      {/* Floating Contextual Eye Layer over the canvas */}
+      {hasEye && selectedId && (
+        components.map(c => {
+           if (c.id === selectedId) {
+              const canvasConfig = (c as any).canvas || {};
+              const cx = (canvasConfig.x || 0) + (canvasConfig.width || 0) + 16;
+              const cy = (canvasConfig.y || 0) - 20;
+              return (
+                 <div key="eye-popup" className="absolute z-50 w-80 h-96 shadow-[0_0_40px_rgba(0,0,0,0.5)] rounded-xl overflow-hidden glassmorphism" 
+                      style={{ left: cx, top: cy, backdropFilter: 'blur(16px)' }}>
+                    <div className="h-8 bg-black/50 backdrop-blur-md border-b border-white/10 flex items-center px-4 font-mono text-[10px] text-blue-400">
+                       [AGENT F] ATTACHED TO: {c.type}
+                    </div>
+                    <div className="w-full h-[calc(100%-2rem)] bg-black/80">
+                       <AIPanel />
+                    </div>
+                 </div>
+              );
+           }
+           return null;
+        })
+      )}
+    </Artboard>
+  );
+
+  return (
+    <IdeShell 
+      projectName={projectName}
+      setProjectName={setProjectName}
+      serverUrl={serverUrl}
+      isExternal={isExternal}
+      externalPort={externalPort}
+      bootStatus={bootStatus}
+      startTargetProcess={startTargetProcess}
+      stopTargetProcess={stopTargetProcess}
+      componentCount={components.length}
+      terminalReady={!!term}
+      rightPanelTop={rightPanelTop}
+      rightPanelBottomSlot={rightPanelBottomSlot}
+      topLeftTerminalSlot={topLeftTerminalSlot}
+      canvasArea={canvasArea}
+      contextualEyeSlot={contextualEyeSlot}
+    />
   )
 }
 
